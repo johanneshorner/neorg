@@ -87,6 +87,8 @@ module.config.public = {
                     { leader .. "li", "core.pivot.invert-list-type", opts = { desc = "Invert (Un)ordered List" } },
 
                     { leader .. "id", "core.tempus.insert-date", opts = { desc = "Insert Date" } },
+                    { leader .. "ci", "core.timetrack.clock-in", opts = { desc = "Clock in" } },
+                    { leader .. "co", "core.timetrack.clock-out", opts = { desc = "Clock out" } },
                 },
 
                 i = {
