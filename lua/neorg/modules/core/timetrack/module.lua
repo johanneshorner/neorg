@@ -4,9 +4,6 @@
     summary: Track the time you spend on various tasks.
     internal: true
     ---
-`core.tempus` is an internal module specifically designed
-to handle complex dates. It exposes two functions: `parse_date(string) -> date|string`
-and `to_lua_date(date) -> osdate`.
 --]]
 
 local module = neorg.modules.create("core.timetrack")
@@ -27,45 +24,46 @@ module.load = function()
     end)
 end
 
--- local function clock_in(event)
---     local mod_todo = module.required["core.qol.todo_items"]
---
---     local node = mod_todo.get_todo_item_from_cursor(event.buffer, event.cursor_position[1] - 1)
---
---     -- cursor not on a todo item
---     if not node then
---         neorg.utils.notify("cursor not on a todo item", vim.log.levels.ERROR)
---         return
---     end
---
---     local tempus = module.required["core.tempus"]
---     local current_time = tostring(tempus.to_date(os.date("*t"), true))
---
---     local current_line_idx = vim.api.nvim_win_get_cursor(0)[1] - 1
---     vim.api.nvim_buf_set_lines(0, current_line_idx + 1, current_line_idx + 1, true, { "{@ " .. current_time .. "}" })
--- end
---
 local function clock_in(event)
-    local mod_treesitter = module.required["core.integrations.treesitter"]
-    local ts_utils = mod_treesitter.get_ts_utils()
-    local current_node = ts_utils.get_node_at_cursor()
-    local found_node = mod_treesitter.find_parent(current_node, "todo_item_")
+    local mod_todo = module.required["core.qol.todo_items"]
+
+    local node = mod_todo.get_todo_item_from_cursor(event.buffer, event.cursor_position[1] - 1)
 
     -- cursor not on a todo item
-    if not found_node then
-        print("fail")
+    if not node then
         neorg.utils.notify("cursor not on a todo item", vim.log.levels.ERROR)
         return
-    else
-        print("success")
     end
-    --
-    -- local tempus = module.required["core.tempus"]
-    -- local current_time = tostring(tempus.to_date(os.date("*t"), true))
-    --
-    -- local current_line_idx = vim.api.nvim_win_get_cursor(0)[1] - 1
-    -- vim.api.nvim_buf_set_lines(0, current_line_idx + 1, current_line_idx + 1, true, { "{@ " .. current_time .. "}" })
+
+    local tempus = module.required["core.tempus"]
+    local current_time = tostring(tempus.to_date(os.date("*t"), true))
+
+    local current_line_idx = vim.api.nvim_win_get_cursor(0)[1] - 1
+    vim.api.nvim_buf_set_lines(0, current_line_idx + 1, current_line_idx + 1, true, { "{@ " .. current_time .. "}" })
 end
+--
+-- local function clock_in(event)
+--     local mod_treesitter = module.required["core.integrations.treesitter"]
+--     local ts_utils = mod_treesitter.get_ts_utils()
+--
+--     local current_node = ts_utils.get_node_at_cursor()
+--     local found_node = mod_treesitter.find_parent(current_node, "todo_item_")
+--
+--     -- cursor not on a todo item
+--     if not found_node then
+--         print("fail")
+--         neorg.utils.notify("cursor not on a todo item", vim.log.levels.ERROR)
+--         return
+--     else
+--         print("success")
+--     end
+--     --
+--     -- local tempus = module.required["core.tempus"]
+--     -- local current_time = tostring(tempus.to_date(os.date("*t"), true))
+--     --
+--     -- local current_line_idx = vim.api.nvim_win_get_cursor(0)[1] - 1
+--     -- vim.api.nvim_buf_set_lines(0, current_line_idx + 1, current_line_idx + 1, true, { "{@ " .. current_time .. "}" })
+-- end
 
 -- searches upwards in the tree to find the first node that is a todo_item and returns it
 -- (this might not work in some cases. Needs a treesitter expert)
