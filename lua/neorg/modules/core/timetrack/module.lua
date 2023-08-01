@@ -27,7 +27,6 @@ end
 
 local function clock_in(event)
     local mod_todo = module.required["core.qol.todo_items"]
-    local mod_ts = module.required["core.integrations.treesitter"]
 
     local todo_node = mod_todo.get_todo_item_from_cursor(event.buffer, event.cursor_position[1] - 1)
 
@@ -38,6 +37,8 @@ local function clock_in(event)
         return
     end
 
+    local mod_ts = module.required["core.integrations.treesitter"]
+
     local todo_line_idx, _, _ = todo_node:start()
     local next_node = mod_ts.get_first_node_on_line(event.buffer, todo_line_idx + 1)
     if not next_node then
@@ -46,18 +47,31 @@ local function clock_in(event)
         return
     end
 
-    if next_node:type() ~= "ranged_verbatim_tag" then
+    if next_node:type() ~= "ranged_tag" then
         local line_idx, _, _ = next_node:start()
-        vim.api.nvim_buf_set_lines(0, line_idx, line_idx, true, { "@timetrack", "@end" })
-        next_node = mod_ts.get_first_node_on_line(event.buffer, todo_line_idx + 1)
+        vim.api.nvim_buf_set_lines(event.buffer, line_idx, line_idx, true, { "|timetrack", "|end" })
     end
 
-    local tag_end_line_idx, _, _ = next_node:end_()
-
     local tempus = module.required["core.tempus"]
-    local current_time = tostring(tempus.to_date(os.date("*t"), true))
+    local tag_start_idx, _, tag_end_idx, _ = next_node:range(false)
+    local entry_idx = tag_start_idx + 1
 
-    vim.api.nvim_buf_set_lines(0, tag_end_line_idx, tag_end_line_idx, true, { "{@ " .. current_time .. "}" })
+    -- there is at least one time entry in the ranged tag
+    if tag_end_idx ~= (tag_start_idx + 1) then
+        local line = vim.api.nvim_buf_get_lines(event.buffer, entry_idx, entry_idx + 1, true)[1]
+        local pos = line:find("-}")
+
+        if pos then
+            pos = pos - 1
+            local time_str = line:gsub("-}", os.date("- %H:%M}"))
+            print(time_str)
+            vim.api.nvim_buf_set_lines(event.buffer, entry_idx, entry_idx + 1, true, { time_str })
+            return
+        end
+    end
+
+    local current_time = tostring(tempus.to_date(os.date("*t"), true))
+    vim.api.nvim_buf_set_lines(0, entry_idx, entry_idx, true, { "{@ " .. current_time .. " -}" })
 end
 --
 -- local function clock_in(event)
