@@ -273,22 +273,22 @@ module.public = {
                 name = lib.title(months[osdate.month]),
             } or nil,
             year = osdate.year,
-            time = osdate.hour and setmetatable({
-                hour = osdate.hour,
-                minute = osdate.min or 0,
-                second = osdate.sec or 0,
-            }, {
-                __tostring = function()
-                    if not include_time then
-                        return ""
-                    end
+            time = osdate.hour
+                    and setmetatable({
+                        hour = osdate.hour,
+                        minute = osdate.min or 0,
+                        second = osdate.sec or 0,
+                    }, {
+                        __tostring = function()
+                            if not include_time then
+                                return ""
+                            end
 
-                    return tostring(osdate.hour)
-                        .. ":"
-                        .. tostring(string.format("%02d", osdate.min))
-                        .. (osdate.sec ~= 0 and ("." .. tostring(osdate.sec)) or "")
-                end,
-            }) or nil,
+                            return tostring(osdate.hour) .. ":" .. tostring(string.format("%02d", osdate.min))
+                            -- .. (osdate.sec ~= 0 and ("." .. tostring(osdate.sec)) or "")
+                        end,
+                    })
+                or nil,
         })
     end,
 

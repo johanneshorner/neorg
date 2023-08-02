@@ -25,10 +25,15 @@ module.load = function()
     end)
 end
 
-local function clock_in(event)
+--- Finds or creates a timetrack tag
+---
+---@param buffer integer
+---@param line_idx integer
+---@return (TSNode|nil)
+local function find_or_create_timetrack_tag(buffer, line_idx)
     local mod_todo = module.required["core.qol.todo_items"]
 
-    local todo_node = mod_todo.get_todo_item_from_cursor(event.buffer, event.cursor_position[1] - 1)
+    local todo_node = mod_todo.get_todo_item_from_cursor(buffer, line_idx)
 
     -- cursor not on a todo item
     if not todo_node then
@@ -39,21 +44,38 @@ local function clock_in(event)
 
     local mod_ts = module.required["core.integrations.treesitter"]
 
-    local todo_line_idx, _, _ = todo_node:start()
-    local next_node = mod_ts.get_first_node_on_line(event.buffer, todo_line_idx + 1)
-    if not next_node then
-        -- not an error, just for debugging purposes
-        neorg.utils.notify("next node nil", vim.log.levels.ERROR)
+    local todo_line_idx = todo_node:start()
+
+    local next_node
+    if todo_line_idx == (vim.api.nvim_buf_line_count(buffer) - 1) then
+        vim.api.nvim_buf_set_lines(buffer, todo_line_idx + 1, todo_line_idx + 1, true, { "|timetrack", "|end" })
+        next_node = mod_ts.get_first_node_on_line(buffer, todo_line_idx + 1)
+    else
+        next_node = mod_ts.get_first_node_on_line(buffer, todo_line_idx + 1)
+        if not next_node then
+            -- not an error, just for debugging purposes
+            neorg.utils.notify("next node nil", vim.log.levels.ERROR)
+            return
+        end
+
+        if next_node:type() ~= "ranged_tag" then
+            -- local timetrack_line_idx = next_node:start()
+            vim.api.nvim_buf_set_lines(buffer, todo_line_idx + 1, todo_line_idx + 1, true, { "|timetrack", "|end" })
+            next_node = mod_ts.get_first_node_on_line(buffer, todo_line_idx + 1)
+        end
+    end
+
+    return next_node
+end
+
+local function clock_out(event)
+    local timetrack_node = find_or_create_timetrack_tag(event.buffer, event.cursor_position[1] - 1)
+
+    if not timetrack_node then
         return
     end
 
-    if next_node:type() ~= "ranged_tag" then
-        local line_idx, _, _ = next_node:start()
-        vim.api.nvim_buf_set_lines(event.buffer, line_idx, line_idx, true, { "|timetrack", "|end" })
-    end
-
-    local tempus = module.required["core.tempus"]
-    local tag_start_idx, _, tag_end_idx, _ = next_node:range(false)
+    local tag_start_idx, _, tag_end_idx, _ = timetrack_node:range(false)
     local entry_idx = tag_start_idx + 1
 
     -- there is at least one time entry in the ranged tag
@@ -64,73 +86,28 @@ local function clock_in(event)
         if pos then
             pos = pos - 1
             local time_str = line:gsub("-}", os.date("- %H:%M}"))
-            print(time_str)
             vim.api.nvim_buf_set_lines(event.buffer, entry_idx, entry_idx + 1, true, { time_str })
-            return
         end
     end
 
-    local current_time = tostring(tempus.to_date(os.date("*t"), true))
-    vim.api.nvim_buf_set_lines(0, entry_idx, entry_idx, true, { "{@ " .. current_time .. " -}" })
+    return entry_idx
 end
---
--- local function clock_in(event)
---     local mod_treesitter = module.required["core.integrations.treesitter"]
---     local ts_utils = mod_treesitter.get_ts_utils()
---
---     local current_node = ts_utils.get_node_at_cursor()
---     local found_node = mod_treesitter.find_parent(current_node, "todo_item_")
---
---     -- cursor not on a todo item
---     if not found_node then
---         print("fail")
---         neorg.utils.notify("cursor not on a todo item", vim.log.levels.ERROR)
---         return
---     else
---         print("success")
---     end
---     --
---     -- local tempus = module.required["core.tempus"]
---     -- local current_time = tostring(tempus.to_date(os.date("*t"), true))
---     --
---     -- local current_line_idx = vim.api.nvim_win_get_cursor(0)[1] - 1
---     -- vim.api.nvim_buf_set_lines(0, current_line_idx + 1, current_line_idx + 1, true, { "{@ " .. current_time .. "}" })
--- end
 
--- searches upwards in the tree to find the first node that is a todo_item and returns it
--- (this might not work in some cases. Needs a treesitter expert)
-local function find_parent_todo(node)
-    local _node = node:parent()
+local function clock_in(event)
+    local entry_idx = clock_out(event)
 
-    while _node do
-        for child, _ in _node:iter_children() do
-            if child:type() == "detached_modifier_extension" then
-                for child_1, _ in child:iter_children() do
-                    if child_1:type():find("todo_item_") then
-                        return child_1
-                    end
-                end
-            end
-        end
-
-        _node = _node:parent()
+    if entry_idx then
+        local tempus = module.required["core.tempus"]
+        local current_time = tostring(tempus.to_date(os.date("*t"), true))
+        vim.api.nvim_buf_set_lines(0, entry_idx, entry_idx, true, { "{@ " .. current_time .. " -}" })
     end
-end
-
-local function clock_out()
-    local mod_treesitter = module.required["core.integrations.treesitter"]
-    local ts_utils = mod_treesitter.get_ts_utils()
-    local current_node = ts_utils.get_node_at_cursor()
-    local found_node = find_parent_todo(current_node)
-
-    print(found_node)
 end
 
 module.on_event = function(event)
     if event.split_type[2] == "core.timetrack.clock-in" then
         clock_in(event)
     elseif event.split_type[2] == "core.timetrack.clock-out" then
-        clock_out()
+        clock_out(event)
     end
 end
 
